@@ -79,6 +79,7 @@ h1 small{display:block;font-family:var(--body);font-size:11px;font-weight:700;co
 .pill{font-family:var(--display);font-size:19px;height:44px;box-sizing:border-box;padding:0 12px;display:flex;align-items:center;gap:6px;background:var(--night-2);border:2px solid var(--brass-dk);border-radius:12px;font-variant-numeric:tabular-nums}
 .bst{position:relative;font-size:22px}
 .bst i{position:absolute;top:-7px;inset-inline-end:-7px;min-width:19px;height:19px;padding:0 4px;box-sizing:border-box;border-radius:10px;background:var(--red);color:#fff;font:800 12px/19px var(--body);font-style:normal}
+.bst:disabled{opacity:.35}
 .bst[aria-pressed="true"]{background:var(--brass);box-shadow:0 0 14px var(--brass)}
 #board.aim{cursor:crosshair;outline:3px dashed var(--brass);outline-offset:3px}
 .prize{font-size:84px;line-height:1.15;margin:4px 0 10px}
@@ -105,7 +106,7 @@ h1 small{display:block;font-family:var(--body);font-size:11px;font-weight:700;co
     <div class="goals" id="goals" aria-label="الهدف"></div>
   </header>
   <div class="stage"><canvas id="board" tabindex="0" aria-label="لوحة اللعب: اسحب أي حاجة لجنبها"></canvas></div>
-  <div class="boost" hidden>
+  <div class="boost">
     <span class="pill" id="coinPill">🪙 <b id="coins">٠</b></span>
     <button class="icon-btn bst" id="hammer" aria-pressed="false">🔨<i></i></button>
     <button class="icon-btn bst" id="shuf">🔀<i></i></button>
@@ -170,7 +171,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 let board=[], sand=[], lvl=0, moves=0, score=0, goals={}, sandGoal=false;
-let busy=true, over=true, sel=-1, cur=27, kbd=false, uid=0, lastAct=0, hint=null, shake=0, time=0;
+let aim=false, busy=true, over=true, sel=-1, cur=27, kbd=false, uid=0, lastAct=0, hint=null, shake=0, time=0;
 const dying=[], parts=[], beams=[], rings=[], zaps=[], texts=[];
 
 const at=k=>board[R_(k)][C_(k)];
@@ -582,6 +583,9 @@ function hud(){
     const v=el.dataset.t==='s'?sandLeft():goals[el.dataset.t];
     el.querySelector('b').textContent=v>0?ar(v):'✓'; el.classList.toggle('done',v<=0);
   });
+  $('#coins').textContent=ar(bag.coins); $('#chestN').textContent=`${ar(Math.min(bag.chest,CHEST))}/${ar(CHEST)}`;
+  for(const id of ['hammer','shuf']){const b=$('#'+id); b.querySelector('i').textContent=ar(bag[id]); b.disabled=over||!bag[id];}
+  $('#hammer').setAttribute('aria-pressed',String(aim)); cv.classList.toggle('aim',aim);
 }
 function iconCanvas(draw){const o=document.createElement('canvas'); o.width=o.height=36*dpr; const g=o.getContext('2d'); g.scale(dpr,dpr); draw(g); return o;}
 function buildGoals(){
@@ -594,7 +598,7 @@ function bump(t){const el=document.querySelector(`.goal[data-t="${t}"]`); if(!el
 function say(x){const arr=KEEPER[x], el=$('#sayText'); el.textContent=arr?arr[rnd(arr.length)]:x; const b=$('#bubble'); b.classList.remove('talk'); void b.offsetWidth; b.classList.add('talk');}
 const ov=$('#ov'), card=$('#card');
 function show(html,btns){
-  card.innerHTML=html; ov.hidden=false; over=true; hud();
+  card.innerHTML=html; ov.hidden=false; over=true; aim=false; hud();
   for(const [id,fn] of Object.entries(btns)) card.querySelector('#'+id).onclick=()=>{ensureAudio(); fn();};
   const b=card.querySelector('button'); if(b) b.focus({preventScroll:true});
 }
@@ -606,8 +610,26 @@ function goalText(L){
 }
 function loadLevel(){try{return Math.min(LEVELS.length-1,Math.max(0,+localStorage.getItem('soukKhan.level')||0));}catch(e){return 0;}}
 function saveLevel(i){try{localStorage.setItem('soukKhan.level',String(Math.min(i,LEVELS.length-1)));}catch(e){}}
+/* ---------- rewards: one saved bag ---------- */
+const CHEST=6, PLUS5=100, DAY=()=>new Date().toDateString();
+const ICON={hammer:'🔨',shuf:'🔀',plus5:'➕'}, BNAME=EN?{hammer:'a hammer',shuf:'a shuffle',plus5:'+5 moves'}:{hammer:'شاكوش',shuf:'لخبطة',plus5:'+٥ حركات'};
+let bag=(()=>{let b={}; try{b=JSON.parse(localStorage.getItem('soukKhan.bag'))||{};}catch(e){} return {coins:0,hammer:1,shuf:1,plus5:0,stars:{},chest:0,day:'',...b};})();
+function saveBag(){try{localStorage.setItem('soukKhan.bag',JSON.stringify(bag));}catch(e){}}
+function addStars(i,s){const old=bag.stars[i]||0, gain=Math.max(0,s-old); bag.stars[i]=old+gain; bag.chest+=gain; return gain;} // only stars above the old best fill the chest, so replays can't farm it
+const totalStars=()=>Object.values(bag.stars).reduce((a,b)=>a+b,0);
+function grant(coins){const k=['hammer','shuf','plus5'][rnd(3)]; bag.coins+=coins; bag[k]++; saveBag(); return {coins,k};}
+const openChest=()=>{bag.chest-=CHEST; return grant(50+rnd(4)*25);};
+const dailyGift=()=>{bag.day=DAY(); return grant(50);};
+function prizeCard(title,give,then){
+  show(`<h2>${title}</h2><button class="prize shake" id="open" aria-label="${EN?'Open':'افتح'}">🎁</button><p>${EN?'Tap to open':'دوس عشان تفتح'}</p>`,{open:()=>{
+    const {coins,k}=give(); sfx('win'); buzz([30,40,60]);
+    for(let i=0;i<40;i++) burst({x:Math.random()*N-.5,y:Math.random()*N-.5,t:rnd(T)},1);
+    show(`<h2>${EN?'You got':'كسبت'}</h2><div class="prize pop">${ICON[k]}</div><p>🪙 ${ar(coins)} + ${BNAME[k]}</p><button class="btn" id="go">${EN?'Nice!':'حلو!'}</button>`,{go:then});
+  }});
+}
 
 function startScreen(){
+  if(bag.day!==DAY()) return prizeCard(EN?'Daily gift!':'هدية النهارده!',dailyGift,startScreen);
   const saved=loadLevel();
   if(EN) show(`<h2>Souk el-Khan</h2>
     <p>The family shop needs your hands, boss. Drag any item onto its neighbour to line up 3 or more of the same.</p>
@@ -658,26 +680,30 @@ async function win(){
   await sleep(1100);
   const bonus=moves*300; score+=bonus; hud();
   const next=lvl+1, lastOne=next>=LEVELS.length; saveLevel(lastOne?0:next);
+  const gain=addStars(lvl,stars); saveBag();
+  const then=()=>intro(lastOne?0:next), go=()=>bag.chest>=CHEST?prizeCard(EN?'Star chest!':'صندوق النجوم!',openChest,then):then();
+  const chest=`<p>⭐ ${ar(totalStars())}${gain?` <small>(+${ar(gain)})</small>`:''} · 🎁 ${ar(Math.min(bag.chest,CHEST))}/${ar(CHEST)}</p><div class="meter" aria-hidden="true"><i style="width:${Math.min(1,bag.chest/CHEST)*100}%"></i></div>`;
   if(EN) show(`<p class="eyebrow">${L.name}</p><h2>${lastOne?'You finished the whole souk!':'Bravo!'}</h2>
     <div class="stars" aria-label="${stars} of 3 stars">${[0,1,2].map(i=>`<span class="${i<stars?'on':''}">★</span>`).join('')}</div>
-    <p>Score: ${ar(score)}${bonus?`<br><small>${ar(bonus)} of it for the moves you had left</small>`:''}</p>
+    <p>Score: ${ar(score)}${bonus?`<br><small>${ar(bonus)} of it for the moves you had left</small>`:''}</p>${chest}
     ${lastOne?'<p>New levels coming soon, inshallah</p>':''}
-    <button class="btn" id="go">${lastOne?'Play again':'Next level'}</button>`,
-    {go:()=>intro(lastOne?0:next)});
+    <button class="btn" id="go">${lastOne?'Play again':'Next level'}</button>`,{go});
   else show(`<p class="eyebrow">${L.name}</p><h2>${lastOne?'خلّصت السوق كله!':'برافو!'}</h2>
     <div class="stars" aria-label="${ar(stars)} من ٣ نجوم">${[0,1,2].map(i=>`<span class="${i<stars?'on':''}">★</span>`).join('')}</div>
-    <p>النقط: ${ar(score)}${bonus?`<br><small>منهم ${ar(bonus)} على الحركات اللي فضلت</small>`:''}</p>
+    <p>النقط: ${ar(score)}${bonus?`<br><small>منهم ${ar(bonus)} على الحركات اللي فضلت</small>`:''}</p>${chest}
     ${lastOne?'<p>مراحل جديدة جاية قريب إن شاء الله</p>':''}
-    <button class="btn" id="go">${lastOne?'العب من الأول':'المرحلة اللي بعدها'}</button>`,
-    {go:()=>intro(lastOne?0:next)});
+    <button class="btn" id="go">${lastOne?'العب من الأول':'المرحلة اللي بعدها'}</button>`,{go});
 }
 async function lose(){
   over=true; busy=true; say('lose'); sfx('lose'); await sleep(700);
   const left=Object.entries(goals).filter(([,v])=>v>0).map(([t,v])=>`${ar(v)} ${NAMES[t]}`);
   if(sandGoal&&sandLeft()>0) left.push(`${ar(sandLeft())} ${SAND}`);
-  show(EN?`<h2>Out of moves!</h2><p>Still left: ${left.join(AND)}</p><button class="btn" id="go">Try again</button>`
-    :`<h2>خلصت الحركات!</h2><p>كان فاضل: ${left.join(AND)}</p><button class="btn" id="go">حاول تاني</button>`,
-    {go:()=>{hide(); startLevel(lvl);}});
+  const can=bag.plus5>0||bag.coins>=PLUS5, cost=bag.plus5?`${ICON.plus5} ×${ar(bag.plus5)}`:`🪙 ${ar(PLUS5)}`;
+  const more=can?`<button class="btn" id="more">${EN?'+5 moves':'+٥ حركات'} · ${cost}</button>`:'';
+  const btns={go:()=>{hide(); startLevel(lvl);}};
+  if(can) btns.more=()=>{if(bag.plus5) bag.plus5--; else bag.coins-=PLUS5; saveBag(); moves+=5; over=false; busy=false; hide(); hud(); lastAct=performance.now();};
+  show(EN?`<h2>Out of moves!</h2><p>Still left: ${left.join(AND)}</p>${more}<button class="${can?'link':'btn'}" id="go">Try again</button>`
+    :`<h2>خلصت الحركات!</h2><p>كان فاضل: ${left.join(AND)}</p>${more}<button class="${can?'link':'btn'}" id="go">حاول تاني</button>`,btns);
 }
 
 /* ---------- input ---------- */
@@ -715,7 +741,7 @@ const vibRow=()=>ANDROID&&!navigator.vibrate?`<p class="vtest">${EN?'This browse
 console.assert(stripLeft(100,0)===-900&&stripLeft(100,1)===-2900,'the finger sits at 1/4 of the strip, then at 3/4');
 stage.addEventListener('pointerdown',e=>{
   ensureAudio(); kbd=false; if(busy||over) return;
-  const k=cellAt(e); if(k<0) return; down={k,x:e.clientX,y:e.clientY};
+  const k=cellAt(e); if(k<0) return; if(aim) return smash(k); down={k,x:e.clientX,y:e.clientY};
   if(!pad) try{stage.setPointerCapture(e.pointerId);}catch(_){} // on iPhone a capture sends the tap's click to the stage, so the switch never flips
 });
 stage.addEventListener('pointermove',e=>{
@@ -734,8 +760,12 @@ cv.addEventListener('keydown',e=>{
   const d={ArrowLeft:[0,-1],ArrowRight:[0,1],ArrowUp:[-1,0],ArrowDown:[1,0]}[e.key];
   if(d){e.preventDefault(); kbd=true; const r=R_(cur)+d[0], c=C_(cur)+d[1]; if(r<0||c<0||r>=N||c>=N) return; const k=K(r,c);
     if(sel>=0){const a=sel; cur=k; trySwap(a,k);} else cur=k;}
-  else if(e.key===' '||e.key==='Enter'){e.preventDefault(); ensureAudio(); kbd=true; sel=sel===cur?-1:cur;}
+  else if(e.key===' '||e.key==='Enter'){e.preventDefault(); ensureAudio(); kbd=true; if(aim) smash(cur); else sel=sel===cur?-1:cur;}
 });
+/* ---------- boosters: they never cost a move ---------- */
+async function smash(k){aim=false; bag.hammer--; saveBag(); busy=true; sel=-1; hint=null; hud(); buzz(30); await cascade(new Set([k]),[]); busy=false; lastAct=performance.now(); after();}
+$('#hammer').addEventListener('click',()=>{if(busy||over||!bag.hammer) return; aim=!aim; hud();});
+$('#shuf').addEventListener('click',async()=>{if(busy||over||!bag.shuf) return; aim=false; bag.shuf--; saveBag(); sel=-1; hint=null; hud(); await shuffle(); lastAct=performance.now();});
 $('#mute').addEventListener('click',e=>{muted=!muted; if(ac) muted?ac.suspend():ac.resume(); e.currentTarget.setAttribute('aria-pressed',String(muted)); try{localStorage.setItem('soukKhan.muted',muted?'1':'');}catch(_){} });
 try{muted=!!localStorage.getItem('soukKhan.muted'); $('#mute').setAttribute('aria-pressed',String(muted));}catch(_){}
 const padShow=()=>{if(pad) pad.style.display=noVib?'none':'block';};
@@ -751,7 +781,8 @@ if(EN){
   $('.who').textContent='Uncle Metwally'; $('#sayText').textContent='Welcome to the souk, ya basha!';
   $('#mute').setAttribute('aria-label','Sound'); $('#vib').setAttribute('aria-label','Vibration off');
   $('#lang').textContent='ع'; $('#lang').setAttribute('aria-label','العربي');
-} else $('#lang').setAttribute('aria-label','English');
+  $('#hammer').setAttribute('aria-label','Hammer: tap a tile to break it'); $('#shuf').setAttribute('aria-label','Shuffle the board'); $('#coinPill').setAttribute('aria-label','Coins'); $('#chestPill').setAttribute('aria-label','Stars toward the next chest');
+} else {$('#lang').setAttribute('aria-label','English'); $('#hammer').setAttribute('aria-label','شاكوش: دوس على حاجة تكسرها'); $('#shuf').setAttribute('aria-label','لخبط اللوحة'); $('#coinPill').setAttribute('aria-label','فلوس'); $('#chestPill').setAttribute('aria-label','نجوم للصندوق الجاي');}
 
 /* ---------- self-check: match rules ---------- */
 (function selfTest(){
@@ -761,6 +792,7 @@ if(EN){
   mk([[3,2],[3,3],[3,4],[3,5]]); P=plan(runs(),[K(3,4)]); console.assert(P.make.length===1&&P.make[0].sp==='h'&&P.make[0].k===K(3,4),'4 in a row makes a line where you swapped');
   mk([]); console.assert(runs().length===0,'filler board has no matches');
   fillBoard(); console.assert(runs().length===0&&findMove(),'new board has no matches and has a move');
+  {const keep=bag; bag={...keep,stars:{},chest:0}; console.assert(addStars(0,2)===2&&addStars(0,1)===0&&addStars(0,3)===1&&bag.chest===3&&totalStars()===3,'stars: only gains over the best fill the chest'); bag=keep;}
   board=[];
 })();
 
