@@ -632,7 +632,6 @@ function startScreen(){
     <button class="btn" id="go">العب${saved?' · المرحلة '+ar(saved+1):''}</button>
     ${saved?'<button class="link" id="reset">ابدأ من الأول</button>':''}`,
     saved?{go:()=>intro(saved),reset:()=>{saveLevel(0); intro(0);}}:{go:()=>intro(0)});
-  const vt=card.querySelector('#vt'); if(vt) vt.onchange=()=>{if(navigator.vibrate) navigator.vibrate(80);};
 }
 function intro(i){
   const L=LEVELS[i];
@@ -710,8 +709,7 @@ if(!navigator.vibrate&&!ANDROID&&navigator.maxTouchPoints){
     setTimeout(rest,Math.max(0,d.at+HOLD+50-performance.now()));};
   pad.addEventListener('touchend',end); pad.addEventListener('touchcancel',end);
 }
-const vibRow=()=>ANDROID&&!navigator.vibrate?`<p class="vtest">${EN?'This browser can’t vibrate. Open the game in Chrome.':'المتصفح ده مش بيهز. افتح اللعبة في كروم.'}</p>`
-  :pad||navigator.vibrate?`<label class="vtest"><input type="checkbox" switch id="vt"> ${EN?'Test vibration':'جرّب الاهتزاز'}</label>`:'';
+const vibRow=()=>ANDROID&&!navigator.vibrate?`<p class="vtest">${EN?'This browser can’t vibrate. Open the game in Chrome.':'المتصفح ده مش بيهز. افتح اللعبة في كروم.'}</p>`:'';
 console.assert(stripLeft(100,0)===-900&&stripLeft(100,1)===-2900,'the finger sits at 1/4 of the strip, then at 3/4');
 stage.addEventListener('pointerdown',e=>{
   ensureAudio(); kbd=false; if(busy||over) return;
