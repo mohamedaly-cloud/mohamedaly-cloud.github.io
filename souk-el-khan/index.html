@@ -301,7 +301,8 @@ function drawKeeper(){
 
 /* ---------- audio: plucks on the Hijaz scale, darbuka doum/tak ---------- */
 let ac=null, muted=false, noVib=false; const lastSfx={};
-function ensureAudio(){ if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} if(ac&&ac.state==='suspended') ac.resume(); }
+function ensureAudio(){ if(muted) return; if(!ac){ // shortcut: muted keeps the engine off; on iPhone a running AudioContext may silence the switch ticks, retest with sound on
+  try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} if(ac&&ac.state==='suspended') ac.resume(); }
 const HIJAZ=[0,1,4,5,7,8,10,12,13,16,17,19,20,22,24];
 function tone(f,dur,type,vol,when=0,f2){
   if(!ac||muted) return; const t0=ac.currentTime+when;
@@ -734,7 +735,7 @@ cv.addEventListener('keydown',e=>{
     if(sel>=0){const a=sel; cur=k; trySwap(a,k);} else cur=k;}
   else if(e.key===' '||e.key==='Enter'){e.preventDefault(); ensureAudio(); kbd=true; sel=sel===cur?-1:cur;}
 });
-$('#mute').addEventListener('click',e=>{muted=!muted; e.currentTarget.setAttribute('aria-pressed',String(muted)); try{localStorage.setItem('soukKhan.muted',muted?'1':'');}catch(_){} });
+$('#mute').addEventListener('click',e=>{muted=!muted; if(ac) muted?ac.suspend():ac.resume(); e.currentTarget.setAttribute('aria-pressed',String(muted)); try{localStorage.setItem('soukKhan.muted',muted?'1':'');}catch(_){} });
 try{muted=!!localStorage.getItem('soukKhan.muted'); $('#mute').setAttribute('aria-pressed',String(muted));}catch(_){}
 const padShow=()=>{if(pad) pad.style.display=noVib?'none':'block';};
 $('#vib').addEventListener('click',e=>{noVib=!noVib; e.currentTarget.setAttribute('aria-pressed',String(noVib)); padShow(); buzz(40); try{localStorage.setItem('soukKhan.noVib',noVib?'1':'');}catch(_){} });

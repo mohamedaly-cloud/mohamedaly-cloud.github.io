@@ -16,6 +16,8 @@ small{opacity:.75}
 <small>Tap boxes 1–6 and 8 once and swipe in box 7. Tell me the numbers that buzz. First check Settings → Sounds &amp; Haptics → System Haptics is ON, and Low Power Mode is off.</small>
 <div id="ua"><small></small></div>
 <p id="game"></p>
+<p><b>Sound check:</b> tap box 3, then each button below in order, tapping box 3 again after each one. Tell me after which button box 3 stops or starts buzzing again.<br>
+<button id="snd">A. Sound on like the game</button> <button id="amb">B. Sound in "ambient" mode</button> <button id="off">C. Sound engine off</button><br><small id="sst">sound engine: not started</small></p>
 
 <label class="t"><b>1</b><span>Real switch, visible</span><input type="checkbox" switch><i></i></label>
 <label class="t"><b>2</b><span>Invisible switch over the box</span><input class="ghost" type="checkbox" switch><i></i></label>
@@ -63,6 +65,13 @@ h8.style.cssText='all:initial;position:absolute;inset:0;display:block;z-index:2;
 w8.type='checkbox'; w8.setAttribute('switch',''); w8.tabIndex=-1; w8.style.cssText=REST+';pointer-events:auto';
 for(const ev of ['click','input','change']) w8.addEventListener(ev,e=>e.stopPropagation());
 w8.addEventListener('click',()=>count($('#s8'))); h8.attachShadow({mode:'closed'}).append(w8); $('#s8').append(h8);
+// sound check: the game starts an AudioContext on the first tap and keeps it running
+let ac=null; const sst=()=>$('#sst').textContent=`sound engine: ${ac?ac.state:'not started'} · audio session: ${navigator.audioSession?navigator.audioSession.type:'no API'}`;
+const beep=()=>{const o=ac.createOscillator(), g=ac.createGain(); g.gain.value=.08; o.frequency.value=760; o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime+.08);};
+$('#snd').onclick=async()=>{ac=ac||new (window.AudioContext||window.webkitAudioContext)(); await ac.resume(); beep(); sst();};
+$('#amb').onclick=async()=>{if(navigator.audioSession) navigator.audioSession.type='ambient'; ac=ac||new (window.AudioContext||window.webkitAudioContext)(); await ac.resume(); beep(); sst();};
+$('#off').onclick=async()=>{if(ac) await ac.suspend(); sst();};
+sst();
 console.assert(REST.includes('opacity:0'),'test switches stay invisible');
 </script>
 </body></html>
