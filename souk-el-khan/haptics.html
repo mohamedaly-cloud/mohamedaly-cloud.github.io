@@ -13,8 +13,9 @@ h1{font-size:20px;margin:0 0 4px}
 small{opacity:.75}
 </style></head><body>
 <h1>Vibration test</h1>
-<small>Tap boxes 1–6 once and swipe in box 7. Tell me the numbers that buzz. First check Settings → Sounds &amp; Haptics → System Haptics is ON, and Low Power Mode is off.</small>
+<small>Tap boxes 1–6 and 8 once and swipe in box 7. Tell me the numbers that buzz. First check Settings → Sounds &amp; Haptics → System Haptics is ON, and Low Power Mode is off.</small>
 <div id="ua"><small></small></div>
+<p id="game"></p>
 
 <label class="t"><b>1</b><span>Real switch, visible</span><input type="checkbox" switch><i></i></label>
 <label class="t"><b>2</b><span>Invisible switch over the box</span><input class="ghost" type="checkbox" switch><i></i></label>
@@ -22,6 +23,7 @@ small{opacity:.75}
 <div class="t" id="s4"><b>4</b><span>Box tap, code clicks a hidden switch</span><i></i></div>
 <div class="t" id="s6"><b>6</b><span>Like 3, plus pointer capture (old game)</span><i></i></div>
 <div class="t" id="s7" style="min-height:120px"><b>7</b><span>Swipe slowly left and right, keep the finger down</span><i></i></div>
+<div class="t" id="s8"><b>8</b><span>Exactly the game's hidden switch</span><i></i></div>
 <div class="t" id="s5"><b>5</b><span>navigator.vibrate (Android only)</span><i></i></div>
 
 <script>
@@ -53,6 +55,14 @@ h7.addEventListener('touchmove',e=>{if(!d) return; d.x=e.changedTouches[0].clien
   if(performance.now()-d.at>=250&&Math.abs(d.x-d.last)>=60){d.last=d.x; d.side^=1; d.n++; $('#s7 i').textContent='jumps '+d.n;} put();},{passive:true});
 const end7=()=>{if(!d) return; const at=d.at; d=null; w7.style.display='none'; void w7.offsetWidth; setTimeout(()=>{w7.style.cssText=REST;},Math.max(0,at+300-performance.now()));};
 h7.addEventListener('touchend',end7); h7.addEventListener('touchcancel',end7);
+// what the game sees on this phone (same site, so same saved settings)
+$('#game').textContent=`vibrate function: ${typeof navigator.vibrate} · touch points: ${navigator.maxTouchPoints} · game vibration: ${localStorage.getItem('soukKhan.noVib')?'OFF':'on'}`;
+// 8: the game's pad, same styles and attributes
+const h8=document.createElement('souk-pad'), w8=document.createElement('input'); h8.setAttribute('aria-hidden','true');
+h8.style.cssText='all:initial;position:absolute;inset:0;display:block;z-index:2;contain:strict;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none';
+w8.type='checkbox'; w8.setAttribute('switch',''); w8.tabIndex=-1; w8.style.cssText=REST+';pointer-events:auto';
+for(const ev of ['click','input','change']) w8.addEventListener(ev,e=>e.stopPropagation());
+w8.addEventListener('click',()=>count($('#s8'))); h8.attachShadow({mode:'closed'}).append(w8); $('#s8').append(h8);
 console.assert(REST.includes('opacity:0'),'test switches stay invisible');
 </script>
 </body></html>

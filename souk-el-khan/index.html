@@ -693,7 +693,7 @@ let pad=null, sw=null, drag=null;
 const rest=()=>{if(!drag) sw.style.cssText=REST;};
 function place(){const b=pad.getBoundingClientRect(); sw.style.cssText=REST+`;pointer-events:none;width:${STRIP}px;height:8px;left:${stripLeft(drag.x-b.left,drag.side)}px;top:${drag.y-b.top-4}px`; void sw.offsetWidth;}
 function hapSwipe(){if(!drag) return; if(performance.now()-drag.at<HOLD){drag.pending=true; return;} drag.moved=true; drag.side^=1; place();} // the switch reads the jump on her next touchmove
-if(!navigator.vibrate&&!ANDROID&&navigator.maxTouchPoints){
+if(!ANDROID&&navigator.maxTouchPoints){ // not gated on navigator.vibrate: an iPhone browser can have the function and still never buzz
   pad=document.createElement('souk-pad'); pad.setAttribute('aria-hidden','true');
   pad.style.cssText='all:initial;position:absolute;inset:0;display:block;z-index:2;contain:strict;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none';
   sw=document.createElement('input'); sw.type='checkbox'; sw.setAttribute('switch',''); sw.tabIndex=-1; sw.style.cssText=REST;
