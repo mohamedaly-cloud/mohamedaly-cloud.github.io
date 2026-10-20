@@ -13,13 +13,15 @@ h1{font-size:20px;margin:0 0 4px}
 small{opacity:.75}
 </style></head><body>
 <h1>Vibration test</h1>
-<small>Tap each yellow box once. Tell me the numbers that buzz. First check Settings → Sounds &amp; Haptics → System Haptics is ON, and Low Power Mode is off.</small>
+<small>Tap boxes 1–6 once and swipe in box 7. Tell me the numbers that buzz. First check Settings → Sounds &amp; Haptics → System Haptics is ON, and Low Power Mode is off.</small>
 <div id="ua"><small></small></div>
 
 <label class="t"><b>1</b><span>Real switch, visible</span><input type="checkbox" switch><i></i></label>
 <label class="t"><b>2</b><span>Invisible switch over the box</span><input class="ghost" type="checkbox" switch><i></i></label>
 <div class="t" id="s3"><b>3</b><span>Invisible switch, hidden inside (like the game)</span><i></i></div>
 <div class="t" id="s4"><b>4</b><span>Box tap, code clicks a hidden switch</span><i></i></div>
+<div class="t" id="s6"><b>6</b><span>Like 3, plus pointer capture (old game)</span><i></i></div>
+<div class="t" id="s7" style="min-height:120px"><b>7</b><span>Swipe slowly left and right, keep the finger down</span><i></i></div>
 <div class="t" id="s5"><b>5</b><span>navigator.vibrate (Android only)</span><i></i></div>
 
 <script>
@@ -36,5 +38,21 @@ root.append(sw); $('#s3').append(host); sw.addEventListener('click',()=>count($(
 const lab=document.createElement('label'); lab.className='hid'; lab.innerHTML='<input type="checkbox" switch>'; document.body.append(lab);
 $('#s4').addEventListener('click',()=>{lab.click(); count($('#s4'));});
 $('#s5').addEventListener('click',()=>{$('#s5 i').textContent=navigator.vibrate?(navigator.vibrate(40)?'buzzed':'refused'):'not in this browser';});
+// 6 and 7 share a pad maker: a see-through switch in a closed shadow root, like 3
+function pad(box){const h=document.createElement('souk-pad'), w=document.createElement('input');
+  h.style.cssText='position:absolute;inset:0;display:block;touch-action:none'; w.type='checkbox'; w.setAttribute('switch','');
+  w.style.cssText=REST; h.attachShadow({mode:'closed'}).append(w); $(box).append(h); return [h,w];}
+const REST='-webkit-appearance:none;appearance:none;position:absolute;left:0;top:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0';
+const [h6,w6]=pad('#s6'); w6.addEventListener('click',()=>count($('#s6')));
+$('#s6').addEventListener('pointerdown',e=>{try{$('#s6').setPointerCapture(e.pointerId);}catch(_){}});
+// 7: the strip trick, one jump every 60 px of drag once 250 ms have passed
+const [h7,w7]=pad('#s7'), W=4000; let d=null;
+const put=()=>{const b=h7.getBoundingClientRect(); w7.style.cssText=REST+`;pointer-events:none;top:0;height:8px;width:${W}px;left:${d.x-b.left-W*(d.side?3:1)/4}px`; void w7.offsetWidth;};
+h7.addEventListener('touchstart',e=>{const t=e.changedTouches[0]; d={at:performance.now(),x:t.clientX,last:t.clientX,side:0,n:0}; put();},{passive:true});
+h7.addEventListener('touchmove',e=>{if(!d) return; d.x=e.changedTouches[0].clientX;
+  if(performance.now()-d.at>=250&&Math.abs(d.x-d.last)>=60){d.last=d.x; d.side^=1; d.n++; $('#s7 i').textContent='jumps '+d.n;} put();},{passive:true});
+const end7=()=>{if(!d) return; const at=d.at; d=null; w7.style.display='none'; void w7.offsetWidth; setTimeout(()=>{w7.style.cssText=REST;},Math.max(0,at+300-performance.now()));};
+h7.addEventListener('touchend',end7); h7.addEventListener('touchcancel',end7);
+console.assert(REST.includes('opacity:0'),'test switches stay invisible');
 </script>
 </body></html>

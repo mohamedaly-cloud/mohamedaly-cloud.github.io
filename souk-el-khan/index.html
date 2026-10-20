@@ -685,14 +685,14 @@ const adj=(a,b)=>Math.abs(R_(a)-R_(b))+Math.abs(C_(a)-C_(b))===1;
 function cellAt(e){const rc=cv.getBoundingClientRect(), c=Math.floor((e.clientX-rc.left-F)/S), r=Math.floor((e.clientY-rc.top-F)/S); return r<0||c<0||r>=N||c>=N?-1:K(r,c);}
 /* iPhone haptics: iOS 26.5+ only ticks when her own touch toggles a switch, so a see-through switch lies over the board.
    A tap toggles it (one tick). In a swipe it turns into a wide strip that we jump under her finger so the drag crosses its middle (one tick). */
-// shortcut: ported from the ilyassesalama/vibration trick, not tried on a real iPhone; swipes faster than HOLD don't tick, the start-card switch always does.
-const STRIP=4000, HOLD=200, stripLeft=(x,side)=>x-STRIP*(side?3:1)/4;
+// shortcut: swipes shorter than HOLD (WebKit starts tracking the switch 250 ms after touchdown) don't tick; explosions and cascades never can, a native app would fix both.
+const STRIP=4000, HOLD=250, stripLeft=(x,side)=>x-STRIP*(side?3:1)/4;
 const REST='-webkit-appearance:none;appearance:none;position:absolute;left:0;top:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;pointer-events:auto';
 const ANDROID=/Android/.test(navigator.userAgent);
 let pad=null, sw=null, drag=null;
 const rest=()=>{if(!drag) sw.style.cssText=REST;};
 function place(){const b=pad.getBoundingClientRect(); sw.style.cssText=REST+`;pointer-events:none;width:${STRIP}px;height:8px;left:${stripLeft(drag.x-b.left,drag.side)}px;top:${drag.y-b.top-4}px`; void sw.offsetWidth;}
-function hapSwipe(){if(drag) drag.pending=true;}
+function hapSwipe(){if(!drag) return; if(performance.now()-drag.at<HOLD){drag.pending=true; return;} drag.moved=true; drag.side^=1; place();} // the switch reads the jump on her next touchmove
 if(!navigator.vibrate&&!ANDROID&&navigator.maxTouchPoints){
   pad=document.createElement('souk-pad'); pad.setAttribute('aria-hidden','true');
   pad.style.cssText='all:initial;position:absolute;inset:0;display:block;z-index:2;contain:strict;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none';
@@ -714,7 +714,7 @@ console.assert(stripLeft(100,0)===-900&&stripLeft(100,1)===-2900,'the finger sit
 stage.addEventListener('pointerdown',e=>{
   ensureAudio(); kbd=false; if(busy||over) return;
   const k=cellAt(e); if(k<0) return; down={k,x:e.clientX,y:e.clientY};
-  try{stage.setPointerCapture(e.pointerId);}catch(_){}
+  if(!pad) try{stage.setPointerCapture(e.pointerId);}catch(_){} // on iPhone a capture sends the tap's click to the stage, so the switch never flips
 });
 stage.addEventListener('pointermove',e=>{
   if(!down) return; const dx=e.clientX-down.x, dy=e.clientY-down.y;
