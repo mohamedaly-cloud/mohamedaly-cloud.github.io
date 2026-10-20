@@ -2,6 +2,13 @@
 <title>Souk el-Khan</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Souk el-Khan">
+<meta name="theme-color" content="#1a1230">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Baloo+Bhaijaan+2:wght@500;700;800&display=swap" rel="stylesheet">
@@ -22,7 +29,7 @@ body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;color:var(--c
     repeating-conic-gradient(from 45deg,rgba(231,178,74,.05) 0 25%,transparent 0 50%);
   background-size:100% 100%,34px 34px}
 .app{height:100%;max-width:520px;margin:0 auto;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;
-  padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  padding-top:max(8px,env(safe-area-inset-top,0px));padding-bottom:max(8px,env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1{font-family:var(--display);font-weight:400;font-size:28px;line-height:1;margin:0;text-align:center;color:var(--brass);text-shadow:0 2px 0 var(--brass-dk)}
 h1 small{display:block;font-family:var(--body);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.12em;text-shadow:none;margin-top:2px}
 .hud{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
@@ -60,7 +67,7 @@ h1 small{display:block;font-family:var(--body);font-size:11px;font-weight:700;co
 .vtest{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 0;font-size:14px;opacity:.85}
 .hap{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .ov{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,6,20,.74);backdrop-filter:blur(3px);z-index:5;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .card{width:100%;max-width:340px;box-sizing:border-box;text-align:center;background:var(--night-2);border:2px solid var(--brass);border-radius:20px;padding:22px 20px;
   box-shadow:0 0 0 5px rgba(231,178,74,.15),0 20px 50px rgba(0,0,0,.6);animation:rise .3s ease-out}
 .card h2{font-family:var(--display);font-weight:400;font-size:38px;line-height:1.1;margin:0 0 6px;color:var(--brass);text-wrap:balance}
@@ -1054,5 +1061,7 @@ new ResizeObserver(()=>resize()).observe(stage);
 fillBoard();
 requestAnimationFrame(frame);
 startScreen();
+// offline play from the home screen; the claude.ai artifact has no sw.js
+if('serviceWorker' in navigator&&!/claude/.test(location.hostname)) navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
