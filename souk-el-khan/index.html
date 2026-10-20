@@ -42,8 +42,8 @@ h1 small{display:block;font-family:var(--body);font-size:11px;font-weight:700;co
 .goal b{font-family:var(--display);font-weight:400;font-size:18px;line-height:1}
 .goal.done b{color:var(--green)}
 .goal.bump{animation:bump .28s}
-.stage{flex:1;min-height:0;display:grid;place-items:center}
-#board{display:block;touch-action:none;border-radius:18px;box-shadow:0 14px 34px rgba(0,0,0,.55)}
+.stage{flex:1;min-height:0;display:grid;place-items:center;position:relative}
+#board{display:block;touch-action:none;pointer-events:none;border-radius:18px;box-shadow:0 14px 34px rgba(0,0,0,.55)}
 #board:focus-visible{outline:3px solid var(--cream);outline-offset:3px}
 .keeper{display:flex;align-items:center;gap:10px}
 .keeper canvas{width:52px;height:52px;flex:none}
@@ -57,7 +57,7 @@ h1 small{display:block;font-family:var(--body);font-size:11px;font-weight:700;co
 .icon-btn:focus-visible,.btn:focus-visible,.link:focus-visible{outline:3px solid var(--cream);outline-offset:3px}
 .icon-btn[aria-pressed="true"] .wave{display:none}
 [hidden]{display:none!important}
-#boardTap{display:contents}
+.vtest{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 0;font-size:14px;opacity:.85}
 .hap{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .ov{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,6,20,.74);backdrop-filter:blur(3px);z-index:5;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -104,7 +104,7 @@ h1 small{display:block;font-family:var(--body);font-size:11px;font-weight:700;co
     <div class="moves" id="movesBox"><b id="moves">٠</b><span>حركات</span></div>
     <div class="goals" id="goals" aria-label="الهدف"></div>
   </header>
-  <div class="stage"><label id="boardTap"><canvas id="board" tabindex="0" aria-label="لوحة اللعب: اسحب أي حاجة لجنبها"></canvas><input class="hap" type="checkbox" switch tabindex="-1" aria-hidden="true"></label></div>
+  <div class="stage"><canvas id="board" tabindex="0" aria-label="لوحة اللعب: اسحب أي حاجة لجنبها"></canvas></div>
   <div class="boost" hidden>
     <span class="pill" id="coinPill">🪙 <b id="coins">٠</b></span>
     <button class="icon-btn bst" id="hammer" aria-pressed="false">🔨<i></i></button>
@@ -616,6 +616,7 @@ function startScreen(){
       <li><b>5 in a row</b> → Grandma's slipper: wipes out a whole colour</li>
       <li><b>Swap two specials</b> → an even bigger blast</li>
     </ul>
+    ${vibRow()}
     <button class="btn" id="go">Play${saved?' · Level '+ar(saved+1):''}</button>
     ${saved?'<button class="link" id="reset">Start over</button>':''}`,
     saved?{go:()=>intro(saved),reset:()=>{saveLevel(0); intro(0);}}:{go:()=>intro(0)});
@@ -627,9 +628,11 @@ function startScreen(){
       <li><b>٥ في صف</b> ← شبشب تيتة: بيمسح لون بحاله</li>
       <li><b>بدّل حاجتين مميزين</b> ← تفرقع أكبر</li>
     </ul>
+    ${vibRow()}
     <button class="btn" id="go">العب${saved?' · المرحلة '+ar(saved+1):''}</button>
     ${saved?'<button class="link" id="reset">ابدأ من الأول</button>':''}`,
     saved?{go:()=>intro(saved),reset:()=>{saveLevel(0); intro(0);}}:{go:()=>intro(0)});
+  const vt=card.querySelector('#vt'); if(vt) vt.onchange=()=>{if(navigator.vibrate) navigator.vibrate(80);};
 }
 function intro(i){
   const L=LEVELS[i];
@@ -681,26 +684,51 @@ async function lose(){
 let down=null;
 const adj=(a,b)=>Math.abs(R_(a)-R_(b))+Math.abs(C_(a)-C_(b))===1;
 function cellAt(e){const rc=cv.getBoundingClientRect(), c=Math.floor((e.clientX-rc.left-F)/S), r=Math.floor((e.clientY-rc.top-F)/S); return r<0||c<0||r>=N||c>=N?-1:K(r,c);}
-let swiped=false;
-cv.addEventListener('pointerdown',e=>{
+/* iPhone haptics: iOS 26.5+ only ticks when her own touch toggles a switch, so a see-through switch lies over the board.
+   A tap toggles it (one tick). In a swipe it turns into a wide strip that we jump under her finger so the drag crosses its middle (one tick). */
+// shortcut: ported from the ilyassesalama/vibration trick, not tried on a real iPhone; swipes faster than HOLD don't tick, the start-card switch always does.
+const STRIP=4000, HOLD=200, stripLeft=(x,side)=>x-STRIP*(side?3:1)/4;
+const REST='-webkit-appearance:none;appearance:none;position:absolute;left:0;top:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;pointer-events:auto';
+const ANDROID=/Android/.test(navigator.userAgent);
+let pad=null, sw=null, drag=null;
+const rest=()=>{if(!drag) sw.style.cssText=REST;};
+function place(){const b=pad.getBoundingClientRect(); sw.style.cssText=REST+`;pointer-events:none;width:${STRIP}px;height:8px;left:${stripLeft(drag.x-b.left,drag.side)}px;top:${drag.y-b.top-4}px`; void sw.offsetWidth;}
+function hapSwipe(){if(drag) drag.pending=true;}
+if(!navigator.vibrate&&!ANDROID&&navigator.maxTouchPoints){
+  pad=document.createElement('souk-pad'); pad.setAttribute('aria-hidden','true');
+  pad.style.cssText='all:initial;position:absolute;inset:0;display:block;z-index:2;contain:strict;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none';
+  sw=document.createElement('input'); sw.type='checkbox'; sw.setAttribute('switch',''); sw.tabIndex=-1; sw.style.cssText=REST;
+  for(const ev of ['click','input','change']) sw.addEventListener(ev,e=>e.stopPropagation());
+  pad.attachShadow({mode:'closed'}).appendChild(sw); stage.appendChild(pad);
+  const mine=e=>drag&&[...e.changedTouches].find(t=>t.identifier===drag.id);
+  pad.addEventListener('touchstart',e=>{const t=e.changedTouches[0]; drag=e.touches.length===1?{id:t.identifier,at:performance.now(),x:t.clientX,y:t.clientY,x0:t.clientX,y0:t.clientY,side:0,pending:false,moved:false}:null;},{passive:true});
+  pad.addEventListener('touchmove',e=>{const t=mine(e); if(!t) return; drag.x=t.clientX; drag.y=t.clientY;
+    if(!drag.moved&&Math.hypot(drag.x-drag.x0,drag.y-drag.y0)<8) return; // a wobbly tap stays a tap, so its release still ticks
+    drag.moved=true; if(drag.pending&&performance.now()-drag.at>=HOLD){drag.pending=false; drag.side^=1;} place();},{passive:true});
+  const end=e=>{const t=mine(e); if(!t) return; const d=drag; drag=null;
+    if(d.moved){sw.style.display='none'; void sw.offsetWidth;} // a finished swipe must not tick again on release
+    setTimeout(rest,Math.max(0,d.at+HOLD+50-performance.now()));};
+  pad.addEventListener('touchend',end); pad.addEventListener('touchcancel',end);
+}
+const vibRow=()=>ANDROID&&!navigator.vibrate?`<p class="vtest">${EN?'This browser can’t vibrate. Open the game in Chrome.':'المتصفح ده مش بيهز. افتح اللعبة في كروم.'}</p>`
+  :pad||navigator.vibrate?`<label class="vtest"><input type="checkbox" switch id="vt"> ${EN?'Test vibration':'جرّب الاهتزاز'}</label>`:'';
+console.assert(stripLeft(100,0)===-900&&stripLeft(100,1)===-2900,'the finger sits at 1/4 of the strip, then at 3/4');
+stage.addEventListener('pointerdown',e=>{
   ensureAudio(); kbd=false; if(busy||over) return;
   const k=cellAt(e); if(k<0) return; down={k,x:e.clientX,y:e.clientY};
-  try{cv.setPointerCapture(e.pointerId);}catch(_){}
+  try{stage.setPointerCapture(e.pointerId);}catch(_){}
 });
-cv.addEventListener('pointermove',e=>{
+stage.addEventListener('pointermove',e=>{
   if(!down) return; const dx=e.clientX-down.x, dy=e.clientY-down.y;
   if(Math.hypot(dx,dy)<S*.35) return;
   let r=R_(down.k), c=C_(down.k); if(Math.abs(dx)>Math.abs(dy)) c+=Math.sign(dx); else r+=Math.sign(dy);
-  const a=down.k; down=null; swiped=true; if(r<0||c<0||r>=N||c>=N) return; trySwap(a,K(r,c));
+  const a=down.k; down=null; if(r<0||c<0||r>=N||c>=N) return; if(!noVib) hapSwipe(); trySwap(a,K(r,c));
 });
-// A swipe never makes a click on the label, so tick from touchend, which still counts as her own touch.
-// shortcut: untested on iOS, WebKit may still drop it; then only taps tick.
-cv.addEventListener('touchend',()=>{if(swiped&&!noVib&&!navigator.vibrate) tap(); swiped=false;});
-cv.addEventListener('pointerup',()=>{
+stage.addEventListener('pointerup',()=>{
   if(!down) return; const k=down.k; down=null;
   if(sel>=0&&adj(sel,k)){const a=sel; trySwap(a,k);} else {sel=sel===k?-1:k; if(sel>=0) sfx('swap');}
 });
-cv.addEventListener('pointercancel',()=>{down=null;});
+stage.addEventListener('pointercancel',()=>{down=null;});
 cv.addEventListener('keydown',e=>{
   if(over||busy) return;
   const d={ArrowLeft:[0,-1],ArrowRight:[0,1],ArrowUp:[-1,0],ArrowDown:[1,0]}[e.key];
@@ -710,9 +738,9 @@ cv.addEventListener('keydown',e=>{
 });
 $('#mute').addEventListener('click',e=>{muted=!muted; e.currentTarget.setAttribute('aria-pressed',String(muted)); try{localStorage.setItem('soukKhan.muted',muted?'1':'');}catch(_){} });
 try{muted=!!localStorage.getItem('soukKhan.muted'); $('#mute').setAttribute('aria-pressed',String(muted));}catch(_){}
-$('#boardTap').addEventListener('click',e=>{if(noVib||navigator.vibrate||!navigator.maxTouchPoints) e.preventDefault();});
-$('#vib').addEventListener('click',e=>{noVib=!noVib; e.currentTarget.setAttribute('aria-pressed',String(noVib)); buzz(40); try{localStorage.setItem('soukKhan.noVib',noVib?'1':'');}catch(_){} });
-try{noVib=!!localStorage.getItem('soukKhan.noVib'); $('#vib').setAttribute('aria-pressed',String(noVib));}catch(_){}
+const padShow=()=>{if(pad) pad.style.display=noVib?'none':'block';};
+$('#vib').addEventListener('click',e=>{noVib=!noVib; e.currentTarget.setAttribute('aria-pressed',String(noVib)); padShow(); buzz(40); try{localStorage.setItem('soukKhan.noVib',noVib?'1':'');}catch(_){} });
+try{noVib=!!localStorage.getItem('soukKhan.noVib'); $('#vib').setAttribute('aria-pressed',String(noVib));}catch(_){} padShow();
 if(!navigator.vibrate&&!navigator.maxTouchPoints) $('#vib').hidden=true;
 $('#lang').addEventListener('click',()=>{try{localStorage.setItem('soukKhan.lang',EN?'ar':'en');}catch(_){} location.reload();});
 if(EN){
