@@ -632,6 +632,10 @@ function fx(sp,r,c,list){
   else if(sp==='r'){list.forEach(k=>zaps.push({r0:r,c0:c,r1:R_(k),c1:C_(k),t:0})); shake+=.5; sfx('shoe'); say('shoe');}
   shake=Math.min(1,shake); buzz(30);
 }
+function confetti(n=120){
+  for(let i=0;i<n&&parts.length<450;i++){const L=i%2, a=-Math.PI/2+(L?-1:1)*(.15+Math.random()*.45), v=S*(14+Math.random()*8);
+    parts.push({x:L?F+B:F,y:F+B,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:1.4+Math.random()*.6,max:2,col:COLORS[rnd(6)],rot:a,vr:(Math.random()-.5)*14,sz:S*(.12+Math.random()*.08)});}
+}
 function burst(p,n=8){
   const x=px(p.x), y=px(p.y), col=p.t===-2?KIND.crate[0]:p.t>=0?COLORS[p.t]:'#ffe08a';
   for(let i=0;i<n&&parts.length<450;i++){const a=Math.random()*7, v=S*(2+Math.random()*4.5);
@@ -657,7 +661,7 @@ async function explode(set,make,chain){
   if(n) texts.push({s:'+'+ar(pts),x:px(sx/n),y:px(sy/n),t:0,size:S*.45,small:true});
   make.forEach(m=>{const p=newPiece(m.t,C_(m.k),R_(m.k)); p.sp=m.sp; p.born=1; board[R_(m.k)][C_(m.k)]=p;});
   sfx('pop',chain-1); if(make.length) sfx('make',chain);
-  if(chain>=2) texts.push({s:PRAISE[Math.min(chain-2,PRAISE.length-1)],x:B/2,y:B*.42,t:0,size:S*(.85+Math.min(chain,6)*.06)});
+  if(chain>=2) texts.push({s:PRAISE[Math.min(chain-2,PRAISE.length-1)],x:B/2,y:B*.42,t:0,size:S*(.95+Math.min(chain,6)*.08),big:true}); if(chain>=2) shake=Math.min(1,shake+.12*chain);
   buzz(chain>=2?24:15);
   hud();
   await sleep(make.length?230:170);
@@ -738,7 +742,7 @@ function update(dt,now){
   if(!busy&&!over&&!hint&&now-lastAct>6000) hint=findMove();
 }
 function drawP(c,p,cx,cy,sc,alpha){
-  const sq=p.sq>0?Math.sin(p.sq*Math.PI)*.16:0, bo=p.born>0?1+Math.sin(p.born*Math.PI)*.35:1;
+  const sq=p.sq>0?Math.sin(p.sq*Math.PI)*.22:0, bo=p.born>0?1+Math.sin(p.born*Math.PI)*.35:1;
   const w=S*sc*(1+sq)*bo, h=S*sc*(1-sq)*bo;
   c.globalAlpha=alpha;
   if(p.sp==='r'){for(let i=0;i<6;i++){c.strokeStyle=COLORS[i]; c.lineWidth=S*.08; c.beginPath(); const a=time*2.4+i*Math.PI/3; c.arc(cx,cy,S*.46*sc,a,a+Math.PI/3); c.stroke();}}
@@ -785,9 +789,9 @@ function draw(){
   for(const x of texts){
     const t=x.t, k=Math.min(1,t/.12)*(1+.18*Math.max(0,1-t*4)), a=t>.8?Math.max(0,(1.1-t)/.3):1, size=x.size*k;
     c.globalAlpha=a; c.font=`${size}px Lalezar, "Baloo Bhaijaan 2", sans-serif`; c.textAlign='center'; c.textBaseline='middle';
-    const y=x.y-S*.7*t; c.lineJoin='round'; c.lineWidth=size*.16; c.strokeStyle='#2a1406'; c.strokeText(x.s,x.x,y);
+    const y=x.y-S*.7*t; c.save(); if(x.big){c.translate(x.x,y); c.rotate(Math.sin(t*14)*.09*Math.max(0,1-t)); c.translate(-x.x,-y);} c.lineJoin='round'; c.lineWidth=size*.16; c.strokeStyle='#2a1406'; c.strokeText(x.s,x.x,y);
     if(x.small) c.fillStyle='#fff'; else {const g=c.createLinearGradient(0,y-size/2,0,y+size/2); g.addColorStop(0,'#fff3b0'); g.addColorStop(1,'#f0a020'); c.fillStyle=g;}
-    c.fillText(x.s,x.x,y);
+    c.fillText(x.s,x.x,y); c.restore();
   }
   c.globalAlpha=1;
 }
@@ -815,6 +819,11 @@ function buildGoals(){
   if(crateGoal) add('c',iconCanvas(g=>{g.translate(18,18); drawKind(g,'crate',14);}),CRATE);
 }
 function bump(t){const el=document.querySelector(`.goal[data-t="${t}"]`); if(!el) return; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');}
+function crateTip(L){
+  if(!L.crate) return '';
+  try{if(localStorage.getItem('soukKhan.crateTip')) return ''; localStorage.setItem('soukKhan.crateTip','1');}catch(e){} // shortcut: no storage = tip every crate level
+  return EN?'Crates break when you match right next to them!':'الصناديق بتتكسر لما توفّق جنبها على طول!';
+}
 function say(x){const arr=KEEPER[x], el=$('#sayText'); el.textContent=arr?arr[rnd(arr.length)]:x; const b=$('#bubble'); b.classList.remove('talk'); void b.offsetWidth; b.classList.add('talk');}
 const ov=$('#ov'), card=$('#card');
 function show(html,btns){
@@ -902,7 +911,7 @@ async function startLevel(i){
   sand=L.sand?L.sand.map(s=>[...s].map(Number)):Array.from({length:N},()=>new Array(N).fill(0));
   dying.length=parts.length=beams.length=rings.length=zaps.length=texts.length=0;
   sel=-1; hint=null; busy=true; over=false;
-  fillBoard(); buildGoals(); hud(); say(L.say); cv.focus({preventScroll:true});
+  fillBoard(); buildGoals(); hud(); say(crateTip(L)||L.say); cv.focus({preventScroll:true});
   await settle(); busy=false; lastAct=performance.now();
 }
 async function win(){
@@ -910,7 +919,8 @@ async function win(){
   const stars=moves>=Math.ceil(L.moves*.3)?3:moves>=Math.ceil(L.moves*.12)?2:1;
   say('win'); sfx('win'); buzz([40,50,40,50,60]);
   texts.push({s:EN?'Bravo!':'برافو!',x:B/2,y:B*.45,t:0,size:S*1.4});
-  for(let i=0;i<70;i++) burst({x:Math.random()*N-.5,y:Math.random()*N-.5,t:rnd(T)},1);
+  confetti(); rings.push({r:(N-1)/2,c:(N-1)/2,t:0,max:5}); shake=.6;
+  eachCell(k=>{const p=at(k); if(p) setTimeout(()=>{p.born=1;},(R_(k)+C_(k))*45);});
   await sleep(1100);
   const bonus=moves*300; score+=bonus; hud();
   const next=lvl+1, lastOne=next>=LEVELS.length, newCh=!lastOne&&chapterOf(next)!==chapterOf(lvl); saveLevel(Math.max(loadLevel(),next));
@@ -1031,6 +1041,8 @@ if(EN){
   console.assert(LEVELS.every(L=>!L.crate||(L.crate.length===8&&L.crate.every(s=>/^[01]{8}$/.test(s)))),'crate maps are 8x8 of 0/1');
   board=[...Array(N)].map((_,r)=>[...Array(N)].map((_,c)=>newPiece(r?(r+c)%3:0,c,r))); board[0].forEach(p=>p.t=-2);
   console.assert(!runs().some(run=>[...run].some(k=>R_(k)===0)),'a row of crates never matches');
+  console.assert(crateTip({})==='','no crate tip on levels without crates');
+  parts.length=440; parts.fill({}); confetti(); console.assert(parts.length===450,'confetti respects the particle cap'); parts.length=0;
   board=[];
 })();
 
