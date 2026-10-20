@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vibration test</title>
+<style>
+:root{color-scheme:light dark}
+body{margin:0;padding:16px;font:16px/1.4 -apple-system,system-ui,sans-serif;background:#fdf6e9;color:#3a2a1a}
+@media (prefers-color-scheme:dark){body{background:#1c1610;color:#f3e6d0}}
+h1{font-size:20px;margin:0 0 4px}
+.t{position:relative;display:flex;align-items:center;gap:12px;margin:12px 0;padding:16px;border-radius:14px;background:#e9b44c;color:#3a2a1a;font-weight:600;min-height:44px;user-select:none;-webkit-user-select:none}
+.t b{font-size:22px;min-width:28px}.t span{flex:1}.t i{font-style:normal;opacity:.7}
+.ghost{-webkit-appearance:none;appearance:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0}
+.hid{position:absolute;opacity:0;pointer-events:none}
+small{opacity:.75}
+</style></head><body>
+<h1>Vibration test</h1>
+<small>Tap each yellow box once. Tell me the numbers that buzz. First check Settings → Sounds &amp; Haptics → System Haptics is ON, and Low Power Mode is off.</small>
+<div id="ua"><small></small></div>
+
+<label class="t"><b>1</b><span>Real switch, visible</span><input type="checkbox" switch><i></i></label>
+<label class="t"><b>2</b><span>Invisible switch over the box</span><input class="ghost" type="checkbox" switch><i></i></label>
+<div class="t" id="s3"><b>3</b><span>Invisible switch, hidden inside (like the game)</span><i></i></div>
+<div class="t" id="s4"><b>4</b><span>Box tap, code clicks a hidden switch</span><i></i></div>
+<div class="t" id="s5"><b>5</b><span>navigator.vibrate (Android only)</span><i></i></div>
+
+<script>
+const $=s=>document.querySelector(s), n={};
+const count=(el)=>{const k=el.querySelector('b').textContent; n[k]=(n[k]||0)+1; el.querySelector('i').textContent='tapped '+n[k];};
+document.querySelectorAll('label.t').forEach(l=>l.addEventListener('click',e=>{if(e.target.tagName==='INPUT') count(l);}));
+$('#ua small').textContent=navigator.userAgent;
+// 3: same as the game, a see-through switch in a closed shadow root
+const host=document.createElement('souk-pad'), root=host.attachShadow({mode:'closed'}), sw=document.createElement('input');
+host.style.cssText='position:absolute;inset:0;display:block';
+sw.type='checkbox'; sw.setAttribute('switch',''); sw.style.cssText='-webkit-appearance:none;appearance:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0';
+root.append(sw); $('#s3').append(host); sw.addEventListener('click',()=>count($('#s3')));
+// 4: the pre-iOS-26.5 trick, a script click on a hidden switch's label
+const lab=document.createElement('label'); lab.className='hid'; lab.innerHTML='<input type="checkbox" switch>'; document.body.append(lab);
+$('#s4').addEventListener('click',()=>{lab.click(); count($('#s4'));});
+$('#s5').addEventListener('click',()=>{$('#s5 i').textContent=navigator.vibrate?(navigator.vibrate(40)?'buzzed':'refused'):'not in this browser';});
+</script>
+</body></html>
